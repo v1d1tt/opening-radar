@@ -26,6 +26,9 @@ export async function POST(req: Request) {
   const { url } = (await req.json()) as { url: string };
   if (!/^https:\/\//.test(url ?? "")) return Response.json({ error: "bad url" }, { status: 400 });
 
+  // Go straight to the form where the board has a fixed form URL.
+  const formUrl = /jobs\.lever\.co/.test(url) ? `${url}/apply` : /jobs\.ashbyhq\.com/.test(url) ? `${url}/application` : url;
+
   const stream = new ReadableStream({
     async start(controller) {
       const enc = new TextEncoder();
@@ -34,9 +37,9 @@ export async function POST(req: Request) {
         let fields: Field[] = [];
         let steps = 0;
         for await (const ev of agentStream({
-          url,
+          url: formUrl,
           goal:
-            "Open the application form for this job. If the form is not visible, click the Apply button once to reveal it. " +
+            "This page has the job's application form, possibly below the job description. Scroll to it. If no form is visible, click the Apply button once. Stay on this job. " +
             "List every field and question on the form: its label or question text, whether it is required, and its type (text, file upload, dropdown, yes/no, long answer). " +
             "Do not type into any field, do not upload anything, do not log in, and never click Submit or Send.",
           output_schema: {
