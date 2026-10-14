@@ -18,6 +18,18 @@ const CATEGORIES = {
   other: "anything else",
 };
 
+const RULES: [RegExp, string][] = [
+  [/resume|\bcv\b/i, "resume"],
+  [/sponsor|visa|work (authori[sz]ation|permit)|authori[sz]ed to work|citizenship|right to work/i, "work_authorization"],
+  [/salary|compensation|stipend|\bctc\b|expected pay/i, "compensation"],
+  [/gender|race|ethnic|veteran|disabilit|pronoun|sexual orientation/i, "demographic"],
+  [/linkedin|github|portfolio|website|\burl\b/i, "links"],
+  [/name|e-?mail|phone|mobile|address|current location|city/i, "identity"],
+  [/school|university|college|degree|graduat|gpa|cgpa/i, "education"],
+  [/start date|notice|availab|relocat|when can you/i, "availability"],
+  [/cover letter|why (do you|are you)|tell us|describe|additional information/i, "essay"],
+];
+
 const FROM_PROFILE = new Set(["identity", "links", "resume", "education"]);
 
 /** Novelty 3: the agent opens the application form and reads it (never types, never submits);
@@ -71,11 +83,17 @@ export async function POST(req: Request) {
         }
         if (!fields.length) throw new Error("no application form found on this page");
 
-        const out = await decideBatch(
-          fields.map((f) => ({ form_field: f.label, type: f.kind ?? "unknown" })),
-          { category: { type: "choice", instructions: "What does this job application form field ask for?", criteria: CATEGORIES } },
-        );
-        const sorted = fields.map((f, i) => ({ ...f, category: out?.answers[i]?.category?.choice ?? "other" }));
+        // Plain rules for the obvious fields; Laya decides the rest.
+        const ruled = fields.map((f) => RULES.find(([re]) => re.test(f.label))?.[1] ?? null);
+        const unknown = fields.filter((_, i) => !ruled[i]);
+        const out = unknown.length
+          ? await decideBatch(
+              unknown.map((f) => ({ form_field: f.label, type: f.kind ?? "unknown" })),
+              { category: { type: "choice", instructions: "What does this job application form field ask for?", criteria: CATEGORIES } },
+            )
+          : null;
+        let u = 0;
+        const sorted = fields.map((f, i) => ({ ...f, category: ruled[i] ?? out?.answers[u++]?.category?.choice ?? "other" }));
         emit({
           type: "done",
           steps,
