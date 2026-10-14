@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
+  serverExternalPackages: ["@receptron/laya", "onnxruntime-node"],
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {

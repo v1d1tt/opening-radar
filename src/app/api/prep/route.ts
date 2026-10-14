@@ -1,0 +1,92 @@
+import { decideBatch } from "@/lib/laya";
+import { agentStream } from "@/lib/tinyfish";
+
+export const maxDuration = 300;
+
+type Field = { label: string; required?: boolean | null; kind?: string | null };
+
+const CATEGORIES = {
+  identity: "name, email, phone number or address",
+  links: "LinkedIn, GitHub, portfolio or website link",
+  resume: "resume or CV file upload",
+  education: "school, degree, graduation year or GPA",
+  work_authorization: "visa status, work authorization, sponsorship or citizenship",
+  availability: "start date, notice period, internship dates or relocation",
+  compensation: "salary, stipend or compensation expectations",
+  essay: "an open question that needs a written answer, such as why this company or a cover letter",
+  demographic: "gender, race, veteran or disability self-identification",
+  other: "anything else",
+};
+
+const FROM_PROFILE = new Set(["identity", "links", "resume", "education"]);
+
+/** Novelty 3: the agent opens the application form and reads it (never types, never submits);
+ *  Laya sorts each field into "your profile covers it", "you must write it" or "check first". */
+export async function POST(req: Request) {
+  const { url } = (await req.json()) as { url: string };
+  if (!/^https:\/\//.test(url ?? "")) return Response.json({ error: "bad url" }, { status: 400 });
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      const enc = new TextEncoder();
+      const emit = (e: object) => controller.enqueue(enc.encode(JSON.stringify(e) + "\n"));
+      try {
+        let fields: Field[] = [];
+        let steps = 0;
+        for await (const ev of agentStream({
+          url,
+          goal:
+            "Open the application form for this job. If the form is not visible, click the Apply button once to reveal it. " +
+            "List every field and question on the form: its label or question text, whether it is required, and its type (text, file upload, dropdown, yes/no, long answer). " +
+            "Do not type into any field, do not upload anything, do not log in, and never click Submit or Send.",
+          output_schema: {
+            type: "object",
+            properties: {
+              fields: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: { label: { type: "string" }, required: { type: "boolean", nullable: true }, kind: { type: "string", nullable: true } },
+                  required: ["label"],
+                },
+              },
+            },
+            required: ["fields"],
+          },
+          browser_profile: "lite",
+        })) {
+          if (ev.type === "STREAMING_URL") emit({ type: "stream", url: ev.streaming_url });
+          if (ev.type === "PROGRESS") {
+            steps++;
+            emit({ type: "progress", text: ev.purpose });
+          }
+          if (ev.type === "COMPLETE") {
+            if (ev.status !== "COMPLETED") throw new Error(`agent ${ev.status.toLowerCase()}`);
+            const r = ev.result as { fields?: Field[] } | null;
+            fields = (r?.fields ?? []).filter((f) => f?.label).slice(0, 30);
+          }
+        }
+        if (!fields.length) throw new Error("no application form found on this page");
+
+        const out = await decideBatch(
+          fields.map((f) => ({ form_field: f.label, type: f.kind ?? "unknown" })),
+          { category: { type: "choice", instructions: "What does this job application form field ask for?", criteria: CATEGORIES } },
+        );
+        const sorted = fields.map((f, i) => ({ ...f, category: out?.answers[i]?.category?.choice ?? "other" }));
+        emit({
+          type: "done",
+          steps,
+          engine: out?.engine ?? "rules",
+          fromProfile: sorted.filter((f) => FROM_PROFILE.has(f.category)),
+          youWrite: sorted.filter((f) => ["essay", "compensation", "availability", "other"].includes(f.category)),
+          checkFirst: sorted.filter((f) => f.category === "work_authorization"),
+          optional: sorted.filter((f) => f.category === "demographic"),
+        });
+      } catch (e) {
+        emit({ type: "error", message: (e as Error).message });
+      }
+      controller.close();
+    },
+  });
+  return new Response(stream, { headers: { "Content-Type": "application/x-ndjson", "Cache-Control": "no-store" } });
+}

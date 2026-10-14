@@ -1,26 +1,68 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --fog: #eef1f6;
+  --paper: #ffffff;
+  --ink: #1a2233;
+  --muted: #5b6477;
+  --line: #d7dce6;
+  --cobalt: #2b47d4;
+  --good: #1e8a5a;
+  --okay: #b7791f;
+  --weak: #8a93a6;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-fog: var(--fog);
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-cobalt: var(--cobalt);
+  --color-good: var(--good);
+  --color-okay: var(--okay);
+  --color-weak: var(--weak);
+  --font-display: var(--font-display);
+  --font-sans: var(--font-body);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--fog);
+  color: var(--ink);
+  font-family: var(--font-body), system-ui, sans-serif;
+}
+
+.input {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  border-radius: 6px;
+  padding: 0.6rem 0.75rem;
+  font-size: 15px;
+}
+
+.input:focus {
+  border-color: var(--cobalt);
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--cobalt);
+  outline-offset: 2px;
+}
+
+@keyframes pulse-dot {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.running-dot {
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .running-dot {
+    animation: none;
+  }
 }
