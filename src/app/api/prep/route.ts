@@ -39,7 +39,8 @@ export async function POST(req: Request) {
   if (!/^https:\/\//.test(url ?? "")) return Response.json({ error: "bad url" }, { status: 400 });
 
   // Go straight to the form where the board has a fixed form URL.
-  const formUrl = /jobs\.lever\.co/.test(url) ? `${url}/apply` : /jobs\.ashbyhq\.com/.test(url) ? `${url}/application` : url;
+  // Lever's /apply page reads empty to the agent, so Lever starts from the job page.
+  const formUrl = /jobs\.ashbyhq\.com/.test(url) ? `${url}/application` : url;
 
   const stream = new ReadableStream({
     async start(controller) {
