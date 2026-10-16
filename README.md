@@ -49,3 +49,6 @@ Environment variables: `TINYFISH_API_KEY`, `LAYA_API_URL`, `LAYA_API_KEY`, and o
 - The TinyFish key stays on the server.
 - The agents never log in, apply, upload or submit anything.
 - The resume PDF is read once to text and not stored on the server.
+
+
+current status: to be updated this weekend.
